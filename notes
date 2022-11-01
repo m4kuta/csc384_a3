@@ -1,0 +1,34 @@
+﻿steps
+    define variables
+    preprocess
+    solve csp
+        select var
+            heuristic
+
+define variables using dictionaries (or lists)
+    id
+    domain
+    assignment
+    value
+
+    current versions?
+
+preprocessing
+    rowMax == 0 => all water row
+    colMax == 0 => all water col
+    given piece => water adjacency
+
+select var
+
+heuristic
+    select square in row/col combo that has highest sum <= max
+
+constraints
+    row max constraint
+    col max constraint
+
+    ship sum constraint
+    piece sum constraint
+
+    waterAdj constraint
+
