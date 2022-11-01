@@ -6,8 +6,8 @@ def readBoard(inputPath):
     board = Board()
     inputFile = open(inputPath)
 
-    board.rowMaxes = [int(char) for char in inputFile.readline()[:-1]]
-    board.colMaxes = [int(char) for char in inputFile.readline()[:-1]]
+    board.rowMax = [int(char) for char in inputFile.readline()[:-1]]
+    board.colMax = [int(char) for char in inputFile.readline()[:-1]]
     board.ships = [int(char) for char in inputFile.readline()[:-1]]
 
     lines = inputFile.read().splitlines()
@@ -18,26 +18,48 @@ def readBoard(inputPath):
 
 
 class Board:
-    rowMaxes = []
-    colMaxes = []
+    rowMax = []
+    colMax = []
     ships = []  # submarines, destroyers, cruisers, battleships
     squares = []
 
     n = 0
     N = 0
-    variables = None
-    domains = []
-    assigned = []
-    values = []
+
     rowRem = []
     colRem = []
     rowSum = []
     colSum = []
 
+    sMax = 0
+    lMax = 0
+    rMax = 0
+    tMax = 0
+    bMax = 0
+    mMax = 0
+
+    sSum = 0
+    lSum = 0
+    rSum = 0
+    tSum = 0
+    bSum = 0
+    mSum = 0
+
+    variables = None
+    domains = []
+    assigned = []
+    values = []
+
+
+
+
     # region HELPERS
     def print(self):
-        for row in self.squares:
-            string = ''
+        print('    ' + ' '.join(str(max) for max in self.colMax))
+        print()
+
+        for i, row in enumerate(self.squares):
+            string = str(self.rowMax[i]) + '   '
             for square in row:
                 string += square + ' '
             print(string[:-1])
@@ -50,110 +72,112 @@ class Board:
 
     def getVarByIndex(self, i, j):
         return i * self.n + j + 1
-
     # endregion HELPERS
 
     # region PREPROCESSING
     def defineVariables(self):
         self.n = len(self.squares)
         self.N = self.n ** 2
-        self.variables = range(self.n ** 2)
-        self.domains = [['S', 'W', 'L', 'R', 'T', 'B', 'M'] for v in self.variables]
-        self.assigned = [False for v in self.variables]
-        self.values = ['0' for v in self.variables]
-        self.rowRem = list(self.rowMaxes)
-        self.colRem = list(self.colMaxes)
+
+        self.variables = range(self.N)
+        self.domains = [['W', 'S', 'L', 'R', 'T', 'B', 'M']] * self.N
+        self.assigned = [False] * self.N
+        self.values = ['0'] * self.N
+
+        self.rowRem = list(self.rowMax)
+        self.colRem = list(self.colMax)
         self.rowSum = [0] * self.n
         self.colSum = [0] * self.n
 
-    # def rowColMaxPreprocess(self):
-    #     for i in range(self.n):
-    #         if self.rowMaxes[i] == 0:
-    #             for j in range(self.n):
-    #                 self.assignSquare(i, j, 'W')
-    #         if self.colMaxes[i] == 0:
-    #             for j in range(self.n):
-    #                 self.assignSquare(j, i, 'W')
-
     def preprocess(self):
+        # water adj constraint
         for i, j in itertools.product(range(self.n), range(self.n)):
             square = self.squares[i][j]
 
-            # water adj constraint
             if square != '0' and square != 'W':
                 self.assignSquare(i, j, square)
                 self.makeAdjWater(i, j, square)
 
-            # row max piece constraint
-            if self.rowMaxes[i] == 0 or (self.rowSum[i] == self.rowMaxes[i] and square == '0'):
-                self.assignSquare(i, j, 'W')
+        # row max piece constraint
+        for i in range(self.n):
+            if self.rowMax[i] == 0 or self.rowRem[i] == 0:
+                for j in range(self.n):
+                    if self.squares[i][j] == '0':
+                        self.assignSquare(i, j, 'W')
 
-            # col max piece constraint
-            if self.colMaxes[j] == 0 or (self.colSum[j] == self.colMaxes[j] and square == '0'):
-                self.assignSquare(i, j, 'W')
-
-    # def preprocess2(self):
-    #     for i in range(self.n):
-    #         rowR = self.rowRem[i]
-    #         if rowR == 0:
-    #             for j in range(self.n):
-    #                 square = self.squares[i][j]
-    #                 if square == '0':
-    #                     self.assignSquare(i, j, 'W')
-    #
-    #     for j in range(self.n):
-    #         colR = self.colRem[j]
-    #         if colR == 0:
-    #             for i in range(self.n):
-    #                 square = self.squares[i][j]
-    #                 if square == '0':
-    #                     self.assignSquare(i, j, 'W')
+        # col max piece constraint
+        for j in range(self.n):
+            if self.colMax[j] == 0 or self.colRem[j] == 0:
+                for i in range(self.n):
+                    if self.squares[i][j] == '0':
+                        self.assignSquare(i, j, 'W')
     # endregion PREPROCESSING
 
     # region ASSIGNMENT
     def assignSquare(self, i, j, piece):
         v = i * self.n + j
+
         self.domains[v] = [piece]
         self.assigned[v] = True
         self.values[v] = piece
         self.squares[i][j] = piece
+
         if piece != '0' and piece != 'W':
             self.rowRem[i] -= 1
             self.colRem[j] -= 1
             self.rowSum[i] += 1
             self.colSum[j] += 1
 
+        if piece == 'S':
+            self.sSum += 1
+        elif piece == 'L':
+            self.lSum += 1
+        elif piece == 'R':
+            self.rSum += 1
+        elif piece == 'T':
+            self.tSum += 1
+        elif piece == 'B':
+            self.bSum += 1
+        elif piece == 'M':
+            self.mSum += 1
+
     def makeAdjWater(self, i, j, piece):
-        # left
-        if i > 0 and piece in ['S', 'L', 'T', 'B']:
-            self.assignSquare(i - 1, j, 'W')
-
-        # right
-        if i < self.n - 1 and piece in ['S', 'R', 'T', 'B']:
-            self.assignSquare(i + 1, j, 'W')
-
-        # down
-        if j > 0 and piece in ['S', 'L', 'R', 'B']:
-            self.assignSquare(i, j - 1, 'W')
+        # ['0', 'W', 'S', 'L', 'R', 'T', 'B', 'M']
+        # row up: -1
+        # row down: +1
+        if piece == 'W' or piece == '0':
+            return
 
         # up
-        if j < self.n - 1 and piece in ['S', 'L', 'R', 'T']:
+        if i < self.n - 1 and piece != 'B':
+            self.assignSquare(i - 1, j, 'W')
+
+        # down
+        if i > 0 and piece != 'T':
+            self.assignSquare(i + 1, j, 'W')
+
+        # left
+        if j > 0 and piece != 'R':
+            self.assignSquare(i, j - 1, 'W')
+
+        # right
+        if j < self.n - 1 and piece != 'L':
             self.assignSquare(i, j + 1, 'W')
 
-        # down-left
-        if i > 0 and j > 0:
-            self.assignSquare(i - 1, j - 1, 'W')
-
         # up-left
-        if i > 0 and j < self.n - 1:
-            self.assignSquare(i - 1, j + 1, 'W')
-
-        # down-right
         if i < self.n - 1 and j > 0:
-            self.assignSquare(i + 1, j - 1, 'W')
+            self.assignSquare(i - 1, j - 1, 'W')
 
         # up-right
         if i < self.n - 1 and j < self.n - 1:
+            self.assignSquare(i - 1, j + 1, 'W')
+
+        # down-left
+        if i > 0 and j > 0:
+            self.assignSquare(i + 1, j - 1, 'W')
+
+        # down-right
+        if i > 0 and j < self.n - 1:
             self.assignSquare(i + 1, j + 1, 'W')
     # endregion ASSIGNMENT
 
@@ -187,7 +211,7 @@ class Board:
         for square in self.squares[i]:
             if square != '0' and square != 'W':
                 sum += 1
-        return sum <= self.rowMaxes[i]
+        return sum <= self.rowMax[i]
 
     def colConstraint(self, j):
         sum = 0
@@ -195,7 +219,7 @@ class Board:
             square = self.squares[i][j]
             if square != '0' and square != 'W':
                 sum += 1
-        return sum <= self.colMaxes[j]
+        return sum <= self.colMax[j]
 
     def subConstraint(self):
         pass
