@@ -2,21 +2,6 @@
 import sys
 
 
-def readBoard(inputPath):
-    board = Board()
-    inputFile = open(inputPath)
-
-    board.rowMax = [int(char) for char in inputFile.readline()[:-1]]
-    board.colMax = [int(char) for char in inputFile.readline()[:-1]]
-    board.ships = [int(char) for char in inputFile.readline()[:-1]]
-
-    lines = inputFile.read().splitlines()
-    for line in lines:
-        board.squares.append(list(line))
-
-    return board
-
-
 class Board:
     rowMax = []
     colMax = []
@@ -47,10 +32,8 @@ class Board:
 
     variables = None
     domains = []
-    assigned = []
     values = []
-
-
+    assigned = []
 
 
     # region HELPERS
@@ -117,10 +100,10 @@ class Board:
     def assignSquare(self, i, j, piece):
         v = i * self.n + j
 
-        self.domains[v] = [piece]
-        self.assigned[v] = True
-        self.values[v] = piece
         self.squares[i][j] = piece
+        self.domains[v] = [piece]
+        self.values[v] = piece
+        self.assigned[v] = True
 
         if piece != '0' and piece != 'W':
             self.rowRem[i] -= 1
@@ -149,11 +132,11 @@ class Board:
             return
 
         # up
-        if i < self.n - 1 and piece != 'B':
+        if i > 0 and piece != 'B':
             self.assignSquare(i - 1, j, 'W')
 
         # down
-        if i > 0 and piece != 'T':
+        if i < self.n - 1 and piece != 'T':
             self.assignSquare(i + 1, j, 'W')
 
         # left
@@ -165,19 +148,19 @@ class Board:
             self.assignSquare(i, j + 1, 'W')
 
         # up-left
-        if i < self.n - 1 and j > 0:
+        if i > 0 and j > 0:
             self.assignSquare(i - 1, j - 1, 'W')
 
         # up-right
-        if i < self.n - 1 and j < self.n - 1:
+        if i > 0 and j < self.n - 1:
             self.assignSquare(i - 1, j + 1, 'W')
 
         # down-left
-        if i > 0 and j > 0:
+        if i < self.n - 1 and j > 0:
             self.assignSquare(i + 1, j - 1, 'W')
 
         # down-right
-        if i > 0 and j < self.n - 1:
+        if i < self.n - 1 and j < self.n - 1:
             self.assignSquare(i + 1, j + 1, 'W')
     # endregion ASSIGNMENT
 
@@ -257,6 +240,29 @@ def solveCSP(board):
 
     board.assigned[v] = False
     return False
+
+def readBoard(inputPath):
+    board = Board()
+    inputFile = open(inputPath)
+
+    board.rowMax = [int(char) for char in inputFile.readline()[:-1]]
+    board.colMax = [int(char) for char in inputFile.readline()[:-1]]
+    board.ships = [int(char) for char in inputFile.readline()[:-1]]
+
+    lines = inputFile.read().splitlines()
+    for line in lines:
+        board.squares.append(list(line))
+
+    return board
+
+
+def writeBoard(board, outputPath):
+    outputFile = open(outputPath, 'w')
+    for row in board.squares:
+        string = ''
+        for square in row:
+            string += square
+        outputFile.write(string + '\n')
 
 # inputPath = sys.argv[1] # Input file
 # outputPath = sys.argv[2] # Output file

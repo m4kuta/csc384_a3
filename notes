@@ -22,6 +22,11 @@ select var
 
 heuristic
     select square in row/col combo that has highest sum <= max
+    squares surrounded by
+        4 W
+            either S or W
+        3 W and 1 piece
+            either piece or W
 
 constraints
     row max constraint
