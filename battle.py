@@ -1,42 +1,44 @@
 ﻿import itertools
 import sys
+from copy import deepcopy
 
 
 class Board:
-    rowPieceCount = []
-    colPieceCount = []
-    ships = []  # submarines, destroyers, cruisers, battleships
-    squares = []
+    def __init__(self):
+        self.rowPieceCount = []
+        self.colPieceCount = []
+        self.ships = []  # submarines, destroyers, cruisers, battleships
+        self.squares = []
 
-    n = 0
-    N = 0
+        self.n = 0
+        self.N = 0
 
-    rowPieceRem = []
-    colPieceRem = []
-    rowPieceSum = []
-    colPieceSum = []
+        self.rowPieceRem = []
+        self.colPieceRem = []
+        self.rowPieceSum = []
+        self.colPieceSum = []
 
-    rowWaterSum = []
-    colWaterSum = []
+        self.rowWaterSum = []
+        self.colWaterSum = []
 
-    sMax = 0
-    lMax = 0
-    rMax = 0
-    tMax = 0
-    bMax = 0
-    mMax = 0
+        self.sMax = 0
+        self.lMax = 0
+        self.rMax = 0
+        self.tMax = 0
+        self.bMax = 0
+        self.mMax = 0
 
-    sSum = 0
-    lSum = 0
-    rSum = 0
-    tSum = 0
-    bSum = 0
-    mSum = 0
+        self.sSum = 0
+        self.lSum = 0
+        self.rSum = 0
+        self.tSum = 0
+        self.bSum = 0
+        self.mSum = 0
 
-    variables = None
-    domains = []
-    values = []
-    assigned = []
+        self.variables = None
+        self.domains = []
+        self.values = []
+        self.assigned = []
 
 
     # region HELPERS
@@ -50,6 +52,14 @@ class Board:
                 string += square + ' '
             print(string[:-1])
         print()
+
+    def __deepcopy__(self, memodict={}):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memodict[id(self)] = result
+        for k, v in self.__dict__.items():
+            setattr(result, k, deepcopy(v, memodict))
+        return result
 
     def getIndexByVar(self, v):
         i = v // self.n
@@ -103,6 +113,10 @@ class Board:
 
     # region ASSIGNMENT
     def assignSquare(self, i, j, piece):
+        # already assigned to that piece
+        if self.squares[i][j] == piece:
+            return
+
         v = i * self.n + j
 
         self.squares[i][j] = piece
@@ -140,19 +154,19 @@ class Board:
             return
 
         # up
-        if i > 0 and piece != 'B':
+        if i > 0 and piece != 'B' and piece != 'M':
             self.assignSquare(i - 1, j, 'W')
 
         # down
-        if i < self.n - 1 and piece != 'T':
+        if i < self.n - 1 and piece != 'T' and piece != 'M':
             self.assignSquare(i + 1, j, 'W')
 
         # left
-        if j > 0 and piece != 'R':
+        if j > 0 and piece != 'R' and piece != 'M':
             self.assignSquare(i, j - 1, 'W')
 
         # right
-        if j < self.n - 1 and piece != 'L':
+        if j < self.n - 1 and piece != 'L' and piece != 'M':
             self.assignSquare(i, j + 1, 'W')
 
         # up-left
@@ -170,6 +184,54 @@ class Board:
         # down-right
         if i < self.n - 1 and j < self.n - 1:
             self.assignSquare(i + 1, j + 1, 'W')
+
+    def testAssignSquare(self, i, j, piece):
+        # already assigned to that piece
+        if self.squares[i][j] == piece:
+            return
+
+        v = i * self.n + j
+
+        self.squares[i][j] = piece
+
+    def testMakeAdjWater(self, i, j, piece):
+        # ['0', 'W', 'S', 'L', 'R', 'T', 'B', 'M']
+        # row up: -1
+        # row down: +1
+        if piece == 'W' or piece == '0':
+            return
+
+        # up
+        if i > 0 and piece != 'B' and piece != 'M':
+            self.testAssignSquare(i - 1, j, 'W')
+
+        # down
+        if i < self.n - 1 and piece != 'T' and piece != 'M':
+            self.testAssignSquare(i + 1, j, 'W')
+
+        # left
+        if j > 0 and piece != 'R' and piece != 'M':
+            self.testAssignSquare(i, j - 1, 'W')
+
+        # right
+        if j < self.n - 1 and piece != 'L' and piece != 'M':
+            self.testAssignSquare(i, j + 1, 'W')
+
+        # up-left
+        if i > 0 and j > 0:
+            self.testAssignSquare(i - 1, j - 1, 'W')
+
+        # up-right
+        if i > 0 and j < self.n - 1:
+            self.testAssignSquare(i - 1, j + 1, 'W')
+
+        # down-left
+        if i < self.n - 1 and j > 0:
+            self.testAssignSquare(i + 1, j - 1, 'W')
+
+        # down-right
+        if i < self.n - 1 and j < self.n - 1:
+            self.testAssignSquare(i + 1, j + 1, 'W')
     # endregion ASSIGNMENT
 
     # region SELECTION
@@ -202,18 +264,52 @@ class Board:
     # endregion SELECTION
 
     # region CONSTRAINTS
-    def checkConstraints(self):
+    def constraintsSatisfied(self):
         return self.rowConstraint() and self.colConstraint()
+
+    # def rowConstraint(self):
+    #     for i in range(self.n):
+    #         if self.rowPieceCount[i] + self.rowWaterSum[i] > self.n or \
+    #     #                 self.rowPieceSum > self.rowPieceCount:
+    #     return True
 
     def rowConstraint(self):
         for i in range(self.n):
-            if self.rowPieceSum[i] + self.rowWaterSum[i] > self.n:
+            pieceSum = 0
+            waterSum = 0
+
+            for j in range(self.n):
+                square = self.squares[i][j]
+                if square != '0' and square != 'W':
+                    pieceSum += 1
+                elif square == 'W':
+                    waterSum += 1
+
+            if self.rowPieceCount[i] + waterSum > self.n or pieceSum > self.rowPieceCount[i]:
                 return False
+
         return True
+
+    # def colConstraint(self):
+    #     for j in range(self.n):
+    #         if self.colPieceCount[j] + self.colWaterSum[j] > self.n or \
+    #                 self.colPieceSum > self.colPieceCount:
+    #             return False
+    #     return True
 
     def colConstraint(self):
         for j in range(self.n):
-            if self.colPieceSum[j] + self.colWaterSum[j] > self.n:
+            pieceSum = 0
+            waterSum = 0
+
+            for i in range(self.n):
+                square = self.squares[i][j]
+                if square != '0' and square != 'W':
+                    pieceSum += 1
+                elif square == 'W':
+                    waterSum += 1
+
+            if self.colPieceCount[j] + waterSum > self.n or pieceSum > self.colPieceCount[j]:
                 return False
         return True
 
@@ -226,33 +322,32 @@ def solveCSP(board):
     if False not in board.assigned:
         return True
 
+    ogSquares = deepcopy(list(board.squares))
     v = board.pickUnassignedVar()
     board.assigned[v] = True
-
-    ogPiece = board.values[v]
     i, j = board.getIndexByVar(v)
 
     for d in board.domains[v]:
-        board.assignSquare(i, j, d)
+        board.testAssignSquare(i, j, d)
+        board.testMakeAdjWater(i, j, d)
+        # print('### STEP TEST ###')
+        # board.print()
         constraintsSatisfied = True
 
-        for i in range(board.n):
-            if not board.rowConstraint(i):
-                constraintsSatisfied = False
-                break
-
-        for j in range(board.n):
-            if not board.colConstraint(j):
-                constraintsSatisfied = False
-                break
+        if not board.constraintsSatisfied():
+            constraintsSatisfied = False
 
         if constraintsSatisfied:
             print('### STEP ###')
+            board.assignSquare(i, j, d)
+            board.makeAdjWater(i, j, d)
             board.print()
             solveCSP(board)
 
         # undo assignment
-        board.assignSquare(i, j, ogPiece)
+        board.squares = deepcopy(ogSquares)
+        # print('### UNDO ###')
+        # board.print()
 
     board.assigned[v] = False
     return False
