@@ -3,18 +3,21 @@ import sys
 
 
 class Board:
-    rowMax = []
-    colMax = []
+    rowPieceCount = []
+    colPieceCount = []
     ships = []  # submarines, destroyers, cruisers, battleships
     squares = []
 
     n = 0
     N = 0
 
-    rowRem = []
-    colRem = []
-    rowSum = []
-    colSum = []
+    rowPieceRem = []
+    colPieceRem = []
+    rowPieceSum = []
+    colPieceSum = []
+
+    rowWaterSum = []
+    colWaterSum = []
 
     sMax = 0
     lMax = 0
@@ -38,11 +41,11 @@ class Board:
 
     # region HELPERS
     def print(self):
-        print('    ' + ' '.join(str(max) for max in self.colMax))
+        print('    ' + ' '.join(str(max) for max in self.colPieceCount))
         print()
 
         for i, row in enumerate(self.squares):
-            string = str(self.rowMax[i]) + '   '
+            string = str(self.rowPieceCount[i]) + '   '
             for square in row:
                 string += square + ' '
             print(string[:-1])
@@ -50,7 +53,7 @@ class Board:
 
     def getIndexByVar(self, v):
         i = v // self.n
-        j = v % self.n - 1
+        j = v % self.n
         return i, j
 
     def getVarByIndex(self, i, j):
@@ -67,10 +70,12 @@ class Board:
         self.assigned = [False] * self.N
         self.values = ['0'] * self.N
 
-        self.rowRem = list(self.rowMax)
-        self.colRem = list(self.colMax)
-        self.rowSum = [0] * self.n
-        self.colSum = [0] * self.n
+        self.rowPieceRem = list(self.rowPieceCount)
+        self.colPieceRem = list(self.colPieceCount)
+        self.rowPieceSum = [0] * self.n
+        self.colPieceSum = [0] * self.n
+        self.rowWaterSum = [0] * self.n
+        self.colWaterSum = [0] * self.n
 
     def preprocess(self):
         # water adj constraint
@@ -83,14 +88,14 @@ class Board:
 
         # row max piece constraint
         for i in range(self.n):
-            if self.rowMax[i] == 0 or self.rowRem[i] == 0:
+            if self.rowPieceCount[i] == 0 or self.rowPieceRem[i] == 0:
                 for j in range(self.n):
                     if self.squares[i][j] == '0':
                         self.assignSquare(i, j, 'W')
 
         # col max piece constraint
         for j in range(self.n):
-            if self.colMax[j] == 0 or self.colRem[j] == 0:
+            if self.colPieceCount[j] == 0 or self.colPieceRem[j] == 0:
                 for i in range(self.n):
                     if self.squares[i][j] == '0':
                         self.assignSquare(i, j, 'W')
@@ -106,12 +111,15 @@ class Board:
         self.assigned[v] = True
 
         if piece != '0' and piece != 'W':
-            self.rowRem[i] -= 1
-            self.colRem[j] -= 1
-            self.rowSum[i] += 1
-            self.colSum[j] += 1
+            self.rowPieceRem[i] -= 1
+            self.colPieceRem[j] -= 1
+            self.rowPieceSum[i] += 1
+            self.colPieceSum[j] += 1
 
-        if piece == 'S':
+        if piece == 'W':
+            self.rowWaterSum[i] += 1
+            self.colWaterSum[j] += 1
+        elif piece == 'S':
             self.sSum += 1
         elif piece == 'L':
             self.lSum += 1
@@ -166,8 +174,13 @@ class Board:
 
     # region SELECTION
     def pickUnassignedVar(self):
-        row, col = self.findMinRemaining()
-        return row * self.n + col + 1
+        # row, col = self.findMinRemaining()
+        # return row * self.n + col + 1
+
+        for v in range(self.N):
+            if not self.assigned[v]:
+                return v
+
 
     def findMinRemaining(self):
         min = sys.maxsize
@@ -176,8 +189,8 @@ class Board:
 
         for i in range(self.n):
             for j in range(self.n):
-                rowRem = self.rowRem[i]
-                colRem = self.colRem[j]
+                rowRem = self.rowPieceRem[i]
+                colRem = self.colPieceRem[j]
                 if rowRem > 0 and colRem > 0:
                     rem = rowRem + colRem
                     if rem < min:
@@ -189,20 +202,20 @@ class Board:
     # endregion SELECTION
 
     # region CONSTRAINTS
-    def rowConstraint(self, i):
-        sum = 0
-        for square in self.squares[i]:
-            if square != '0' and square != 'W':
-                sum += 1
-        return sum <= self.rowMax[i]
+    def checkConstraints(self):
+        return self.rowConstraint() and self.colConstraint()
 
-    def colConstraint(self, j):
-        sum = 0
+    def rowConstraint(self):
         for i in range(self.n):
-            square = self.squares[i][j]
-            if square != '0' and square != 'W':
-                sum += 1
-        return sum <= self.colMax[j]
+            if self.rowPieceSum[i] + self.rowWaterSum[i] > self.n:
+                return False
+        return True
+
+    def colConstraint(self):
+        for j in range(self.n):
+            if self.colPieceSum[j] + self.colWaterSum[j] > self.n:
+                return False
+        return True
 
     def subConstraint(self):
         pass
@@ -217,25 +230,28 @@ def solveCSP(board):
     board.assigned[v] = True
 
     ogPiece = board.values[v]
+    i, j = board.getIndexByVar(v)
+
     for d in board.domains[v]:
-        i = v // board.n
-        j = v % board.n - 1
         board.assignSquare(i, j, d)
-        satisfied = True
+        constraintsSatisfied = True
 
         for i in range(board.n):
             if not board.rowConstraint(i):
-                satisfied = False
+                constraintsSatisfied = False
                 break
 
         for j in range(board.n):
             if not board.colConstraint(j):
-                satisfied = False
+                constraintsSatisfied = False
                 break
 
-        if satisfied:
+        if constraintsSatisfied:
+            print('### STEP ###')
+            board.print()
             solveCSP(board)
 
+        # undo assignment
         board.assignSquare(i, j, ogPiece)
 
     board.assigned[v] = False
@@ -245,8 +261,8 @@ def readBoard(inputPath):
     board = Board()
     inputFile = open(inputPath)
 
-    board.rowMax = [int(char) for char in inputFile.readline()[:-1]]
-    board.colMax = [int(char) for char in inputFile.readline()[:-1]]
+    board.rowPieceCount = [int(char) for char in inputFile.readline()[:-1]]
+    board.colPieceCount = [int(char) for char in inputFile.readline()[:-1]]
     board.ships = [int(char) for char in inputFile.readline()[:-1]]
 
     lines = inputFile.read().splitlines()

@@ -3,7 +3,7 @@
     preprocess
     solve csp
         select var
-            heuristic
+        heuristics
 
 define variables using dictionaries (or lists)
     id
@@ -20,6 +20,7 @@ preprocessing
 
 select var
 
+
 heuristic
     select square in row/col combo that has highest sum <= max
     squares surrounded by
@@ -29,11 +30,15 @@ heuristic
             either piece or W
 
 constraints
-    row max constraint
-    col max constraint
+    row constraint
+        piece count
+        water count
+    col constraint
+        piece count
+        water count
 
-    ship sum constraint
-    piece sum constraint
+    piece constraint
+        piece count
 
     waterAdj constraint
 
