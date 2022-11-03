@@ -3,8 +3,8 @@
 # inputPath = "battle_validate/input_easy1.txt"
 # inputPath = "battle_validate/input_easy2.txt"
 # inputPath = "battle_validate/input_medium1.txt"
-inputPath = "battle_validate/input_medium2.txt"
-# inputPath = "battle_validate/input_hard1.txt"
+# inputPath = "battle_validate/input_medium2.txt"
+inputPath = "battle_validate/input_hard1.txt"
 # inputPath = "battle_validate/input_hard2.txt"
 
 print('### readBoard & defineVariables ###')

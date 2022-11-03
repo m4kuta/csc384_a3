@@ -1,5 +1,4 @@
-﻿import itertools
-import sys
+﻿import sys
 from copy import deepcopy
 
 
@@ -35,9 +34,7 @@ class Board:
         self.bSum = 0
         self.mSum = 0
 
-        self.variables = None
         self.domains = []
-        self.values = []
         self.assigned = []
 
 
@@ -52,14 +49,6 @@ class Board:
                 string += square + ' '
             print(string[:-1])
         print()
-
-    def __deepcopy__(self, memodict={}):
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memodict[id(self)] = result
-        for k, v in self.__dict__.items():
-            setattr(result, k, deepcopy(v, memodict))
-        return result
 
     def getIndexByVar(self, v):
         i = v // self.n
@@ -102,27 +91,28 @@ class Board:
         self.colWaterSum = [0] * self.n
 
     def preprocess(self):
-        for i, j in itertools.product(range(self.n), range(self.n)):
-            square = self.squares[i][j]
+        for i in range(self.n):
+            for j in range(self.n):
+                square = self.squares[i][j]
 
-            # water adj constraint
-            if square != '0' and square != 'W':
-                self.assignSquare(i, j, square, True)
-                self.makeAdjWater(i, j, square)
+                # water adj constraint
+                if square != '0' and square != 'W':
+                    self.assignSquare(i, j, square, True)
+                    self.makeAdjWater(i, j, square)
 
-            # edge row/column piece constraints
-            # top
-            if i == 0 and 'B' in self.domains[i][j]:
-                self.domains[i][j].remove('B')
-            # bottom
-            if i == self.n - 1 and 'T' in self.domains[i][j]:
-                self.domains[i][j].remove('T')
-            # left
-            if j == 0 and 'R' in self.domains[i][j]:
-                self.domains[i][j].remove('R')
-            # right
-            if j == self.n - 1 and 'L' in self.domains[i][j]:
-                self.domains[i][j].remove('L')
+                # edge row/column piece constraints
+                # top
+                if i == 0 and 'B' in self.domains[i][j]:
+                    self.domains[i][j].remove('B')
+                # bottom
+                if i == self.n - 1 and 'T' in self.domains[i][j]:
+                    self.domains[i][j].remove('T')
+                # left
+                if j == 0 and 'R' in self.domains[i][j]:
+                    self.domains[i][j].remove('R')
+                # right
+                if j == self.n - 1 and 'L' in self.domains[i][j]:
+                    self.domains[i][j].remove('L')
 
         # row max piece constraint
         for i in range(self.n):
@@ -153,6 +143,7 @@ class Board:
         self.values[v] = piece
         self.assigned[v] = True
 
+        # TODO: move constraints out of assign
         # TODO: add index constraints? should already be handled by preprocessing
         if piece == 'L':
             domain = self.domains[i][j+1]
@@ -316,11 +307,12 @@ class Board:
     def findMinDomain(self):
         min = sys.maxsize
         minI, minJ = -1, -1
-        for i, j in itertools.product(range(self.n), range(self.n)):
-            size = len(self.domains[i][j])
-            if size < min and not self.assigned[self.getVarByIndex(i, j)]:
-                min = size
-                minI, minJ = i, j
+        for i in range(self.n):
+            for j in range(self.n):
+                size = len(self.domains[i][j])
+                if size < min and not self.assigned[self.getVarByIndex(i, j)]:
+                    min = size
+                    minI, minJ = i, j
         return self.getVarByIndex(minI, minJ)
 
     def findMinUnassigned(self):
@@ -330,14 +322,19 @@ class Board:
 
         for i in range(self.n):
             for j in range(self.n):
+                v = self.getVarByIndex(i, j)
+                if self.assigned[v]:
+                    continue
+
                 rowRem = self.getRowUnassigned(i)
                 colRem = self.getColUnassigned(j)
-                if rowRem > 0 and colRem > 0:
-                    rem = rowRem + colRem
-                    v = self.getVarByIndex(i, j)
-                    if rem < min and not self.assigned[v]:
-                        min = rem
-                        minV = v
+                if rowRem <= 0 or colRem <= 0:
+                    continue
+
+                rem = rowRem + colRem
+                if rem < min:
+                    min = rem
+                    minV = v
 
         return minV
     # endregion SELECTION
@@ -345,6 +342,9 @@ class Board:
     # region CONSTRAINTS
     def constraintsSatisfied(self):
         return self.rowConstraint() and self.colConstraint()
+
+    def constraintsSatisfiedTight(self, i, j):
+        return self.rowConstraintTight(i, j) and self.colConstraint()
 
     # def rowConstraint(self):
     #     for i in range(self.n):
@@ -358,6 +358,23 @@ class Board:
             waterSum = 0
 
             for j in range(self.n):
+                square = self.squares[i][j]
+                if square != '0' and square != 'W':
+                    pieceSum += 1
+                elif square == 'W':
+                    waterSum += 1
+
+            if self.rowPieceCount[i] + waterSum > self.n or pieceSum > self.rowPieceCount[i]:
+                return False
+
+        return True
+
+    def rowConstraintTight(self, i, j):
+        for i in range(max(i - 1, 0), min(i + 2, self.n)):
+            pieceSum = 0
+            waterSum = 0
+
+            for j in range(max(j - 1, 0), min(j + 2, self.n)):
                 square = self.squares[i][j]
                 if square != '0' and square != 'W':
                     pieceSum += 1
@@ -392,7 +409,23 @@ class Board:
                 return False
         return True
 
-    def subConstraint(self):
+    def colConstraintTight(self, i, j):
+        for j in range(max(j - 1, 0), min(j + 2, self.n)):
+            pieceSum = 0
+            waterSum = 0
+
+            for i in range(max(i - 1, 0), min(i + 2, self.n)):
+                square = self.squares[i][j]
+                if square != '0' and square != 'W':
+                    pieceSum += 1
+                elif square == 'W':
+                    waterSum += 1
+
+            if self.colPieceCount[j] + waterSum > self.n or pieceSum > self.colPieceCount[j]:
+                return False
+        return True
+
+    def gacEnforce(self):
         pass
     # endregion CONSTRAINTS
 
@@ -451,7 +484,7 @@ def writeBoard(board, outputPath):
         string = ''
         for square in row:
             string += square
-        outputFile.write(string + '\n')
+        outputFile.write(string + '\n') # TODO remove final blank line
 
 # inputPath = sys.argv[1] # Input file
 # outputPath = sys.argv[2] # Output file

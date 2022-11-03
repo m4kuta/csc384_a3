@@ -34,7 +34,7 @@ heuristic
             either piece or W
 
 assign var
-
+    constraints are in here atm, move out
 
 constraints
     row constraint
@@ -46,3 +46,6 @@ constraints
 
     piece constraint
         piece count
+
+    M constraint
+        cant be surrounded by W on two sides not in same col/row
