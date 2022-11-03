@@ -15,14 +15,11 @@ class Board:
         self.domains = [[['W', 'S', 'L', 'R', 'T', 'B', 'M'] for j in range(self.n)] for i in range(self.n)]
         self.assigned = [[False for j in range(self.n)] for i in range(self.n)]
 
-        self.rowPieceRem = list(self.rowPieceCount)
-        self.colPieceRem = list(self.colPieceCount)
+        self.rowPieceSum = [0 for i in range(self.n)]
+        self.colPieceSum = [0 for j in range(self.n)]
 
-        self.rowPieceSum = [0] * self.n
-        self.colPieceSum = [0] * self.n
-
-        self.rowWaterSum = [0] * self.n
-        self.colWaterSum = [0] * self.n
+        self.rowWaterSum = [0 for i in range(self.n)]
+        self.colWaterSum = [0 for j in range(self.n)]
 
         self.pieceMax = {}
         for i in range(len(self.shipCounts)):
@@ -133,6 +130,7 @@ class Board:
                     if self.squares[i][j] == '0':
                         self.assignSquare(i, j, 'W')
 
+        # TODO: combine this with above?
         # col max piece constraint
         for j in range(self.n):
             if self.colPieceCount[j] == 0 or self.colPieceSum[j] == self.colPieceCount[j]:
@@ -143,17 +141,12 @@ class Board:
 
     # region ASSIGNMENT
     def assignSquare(self, i, j, piece, isPreprocess = False):
-        updateSums = True
-        # already assigned to that piece
-        if self.squares[i][j] == piece and not isPreprocess:
-            updateSums = False
-
         self.squares[i][j] = piece
         self.domains[i][j] = [piece]
         self.assigned[i][j] = True
 
         # TODO: move constraints out of assign
-        # TODO: add index constraints? should already be handled by preprocessing
+        # index constraints of given piece already handled by preprocessing
         if piece == 'L':
             domain = self.domains[i][j+1]
             domain = [d for d in domain if d not in ['W', 'S', 'L', 'T', 'B']]
@@ -180,20 +173,13 @@ class Board:
                 domain = self.domains[i][j + 1]
                 domain = [d for d in domain if d not in ['S', 'L', 'T', 'B']]
 
-
-        if not updateSums:
-            return
-
-        if piece != '0' and piece != 'W':
-            self.rowPieceRem[i] -= 1
-            self.colPieceRem[j] -= 1
-            self.rowPieceSum[i] += 1
-            self.colPieceSum[j] += 1
-
         if piece == 'W':
             self.rowWaterSum[i] += 1
             self.colWaterSum[j] += 1
-        else:
+        elif piece != '0':
+            self.rowPieceSum[i] += 1
+            self.colPieceSum[j] += 1
+
             if piece in self.pieceSum:
                 self.pieceSum[piece] += 1
             else:
@@ -251,52 +237,6 @@ class Board:
         # down-right
         if i < self.n - 1 and j < self.n - 1:
             self.assignSquare(i + 1, j + 1, 'W')
-
-    def testAssignSquare(self, i, j, piece):
-        # already assigned to that piece
-        if self.squares[i][j] == piece:
-            return
-
-        self.squares[i][j] = piece
-
-    def testMakeAdjWater(self, i, j, piece):
-        # ['0', 'W', 'S', 'L', 'R', 'T', 'B', 'M']
-        # row up: -1
-        # row down: +1
-        if piece == 'W' or piece == '0':
-            return
-
-        # up
-        if i > 0 and piece != 'B' and piece != 'M':
-            self.testAssignSquare(i - 1, j, 'W')
-
-        # down
-        if i < self.n - 1 and piece != 'T' and piece != 'M':
-            self.testAssignSquare(i + 1, j, 'W')
-
-        # left
-        if j > 0 and piece != 'R' and piece != 'M':
-            self.testAssignSquare(i, j - 1, 'W')
-
-        # right
-        if j < self.n - 1 and piece != 'L' and piece != 'M':
-            self.testAssignSquare(i, j + 1, 'W')
-
-        # up-left
-        if i > 0 and j > 0:
-            self.testAssignSquare(i - 1, j - 1, 'W')
-
-        # up-right
-        if i > 0 and j < self.n - 1:
-            self.testAssignSquare(i - 1, j + 1, 'W')
-
-        # down-left
-        if i < self.n - 1 and j > 0:
-            self.testAssignSquare(i + 1, j - 1, 'W')
-
-        # down-right
-        if i < self.n - 1 and j < self.n - 1:
-            self.testAssignSquare(i + 1, j + 1, 'W')
     # endregion ASSIGNMENT
 
     # region SELECTION
@@ -307,11 +247,11 @@ class Board:
         #         if not self.assigned[i][j]:
         #             return v
 
-        # Min unassigned row/col intersection
-        return self.findMinUnassigned()
-
         # MRV in domain
         # return self.findMinDomain()
+
+        # Min unassigned row/col intersection
+        return self.findMinUnassigned()
 
     def findMinDomain(self):
         min = sys.maxsize
@@ -364,7 +304,8 @@ class Board:
     # def rowConstraint(self):
     #     for i in range(self.n):
     #         if self.rowPieceCount[i] + self.rowWaterSum[i] > self.n or \
-    #     #                 self.rowPieceSum > self.rowPieceCount:
+    #                 self.rowPieceSum[i] > self.rowPieceCount[i]:
+    #             return False
     #     return True
 
     def rowConstraint(self):
@@ -404,7 +345,7 @@ class Board:
     # def colConstraint(self):
     #     for j in range(self.n):
     #         if self.colPieceCount[j] + self.colWaterSum[j] > self.n or \
-    #                 self.colPieceSum > self.colPieceCount:
+    #                 self.colPieceSum[j] > self.colPieceCount[j]:
     #             return False
     #     return True
 
@@ -483,6 +424,9 @@ def solveCSP(board):
     board.assigned[i][j] = False
     return False
 
+# region I/O
+outputPath = "output.txt"
+
 def readBoard(inputPath):
     inputFile = open(inputPath)
 
@@ -497,7 +441,6 @@ def readBoard(inputPath):
 
     return Board(rowPieceCount, colPieceCount, ships, squares)
 
-
 def writeBoard(board, outputPath):
     outputFile = open(outputPath, 'w')
     for row in board.squares:
@@ -505,9 +448,7 @@ def writeBoard(board, outputPath):
         for square in row:
             string += square
         outputFile.write(string + '\n') # TODO remove final blank line
-
-
-outputPath = "output.txt"
+# endregion I/O
 
 # inputPath = sys.argv[1] # Input file
 # outputPath = sys.argv[2] # Output file

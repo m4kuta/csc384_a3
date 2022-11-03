@@ -54,3 +54,9 @@ constraints
 assignSquare
     check if square being assigned is already assigned?
         wont work with current way because i dont check water adj constraints after assignment
+
+have constraints applied in assignment
+    then check for water + piece count constraints?
+
+or assign piece
+    check a bunch of constraints

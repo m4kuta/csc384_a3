@@ -11,7 +11,6 @@ print('### readBoard ###')
 board = readBoard(inputPath)
 board.print()
 
-
 print('### preprocess ###')
 board.preprocess()
 board.print()
