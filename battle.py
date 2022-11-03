@@ -3,44 +3,63 @@ from copy import deepcopy
 
 
 class Board:
-    def __init__(self):
-        self.rowPieceCount = []
-        self.colPieceCount = []
-        self.ships = []  # submarines, destroyers, cruisers, battleships
+    def __init__(self, rowPieceCount, colPieceCount, ships, squares):
+        self.rowPieceCount = rowPieceCount
+        self.colPieceCount = colPieceCount
+        self.shipCounts = ships  # submarines, destroyers, cruisers, battleships
+        self.squares = squares
 
-        self.n = 0
-        self.N = 0
+        self.n = len(self.squares)
+        self.N = self.n ** 2
 
-        self.squares = []
-        self.domains = []
-        self.assigned = []
+        self.domains = [[['W', 'S', 'L', 'R', 'T', 'B', 'M'] for j in range(self.n)] for i in range(self.n)]
+        self.assigned = [[False for j in range(self.n)] for i in range(self.n)]
 
+        self.rowPieceRem = list(self.rowPieceCount)
+        self.colPieceRem = list(self.colPieceCount)
 
-        self.rowPieceRem = []
-        self.colPieceRem = []
+        self.rowPieceSum = [0] * self.n
+        self.colPieceSum = [0] * self.n
 
-        self.rowPieceSum = []
-        self.colPieceSum = []
+        self.rowWaterSum = [0] * self.n
+        self.colWaterSum = [0] * self.n
 
-        self.rowWaterSum = []
-        self.colWaterSum = []
+        self.pieceMax = {}
+        for i in range(len(self.shipCounts)):
+            if i == 3:
+                pass
+            else:
+                num = 1 * self.shipCounts[i]
 
-        self.pieceCounts = {}
-        # self.sCount = 0
-        # self.lCount = 0
-        # self.rCount = 0
-        # self.tCount = 0
-        # self.bCount = 0
-        # self.mCount = 0
+                if i == 0: # submarine
+                    pieces = ['S']
+                elif i == 1: # destroyers
+                    pieces = ['L', 'R', 'T', 'B']
+                else: # i == 2: # cruisers
+                    pieces = ['L', 'R', 'T', 'B', 'M']
 
-        self.pieceSums = {}
-        # self.sSum = 0
-        # self.lSum = 0
-        # self.rSum = 0
-        # self.tSum = 0
-        # self.bSum = 0
-        # self.mSum = 0
+                for piece in pieces:
+                    if piece in self.pieceMax:
+                        self.pieceMax[piece] += num
+                    else:
+                        self.pieceMax[piece] = num
 
+            if i == 3: # battleships
+                num = 1 * self.shipCounts[i]
+
+                for piece in ['L', 'R', 'T', 'B']:
+                    if piece in self.pieceMax:
+                        self.pieceMax[piece] += num
+                    else:
+                        self.pieceMax[piece] = num
+
+                num = 2 * self.shipCounts[i]
+                if 'M' in self.pieceMax:
+                    self.pieceMax['M'] += num
+                else:
+                    self.pieceMax['M'] = num
+
+        self.pieceSum = {}
 
     # region HELPERS
     def print(self):
@@ -78,22 +97,6 @@ class Board:
     # endregion HELPERS
 
     # region PREPROCESSING
-    def initializeVariables(self):
-        self.n = len(self.squares)
-        self.N = self.n ** 2
-
-        self.domains = [[['W', 'S', 'L', 'R', 'T', 'B', 'M'] for j in range(self.n)] for i in range(self.n)]
-        self.assigned = [[False for j in range(self.n)] for i in range(self.n)]
-
-        self.rowPieceRem = list(self.rowPieceCount)
-        self.colPieceRem = list(self.colPieceCount)
-
-        self.rowPieceSum = [0] * self.n
-        self.colPieceSum = [0] * self.n
-
-        self.rowWaterSum = [0] * self.n
-        self.colWaterSum = [0] * self.n
-
     def preprocess(self):
         for i in range(self.n):
             for j in range(self.n):
@@ -107,8 +110,8 @@ class Board:
                 # edge row/column piece constraints
                 # corner
                 if 'M' in self.domains[i][j] and \
-                        (i == 0 and j == 0) or (i == 0 and j == self.n - 1) or \
-                        (i == self.n - 1 and j == 0) or (i == self.n - 1 and j == self.n -1):
+                        ((i == 0 and j == 0) or (i == 0 and j == self.n - 1) or
+                         (i == self.n - 1 and j == 0) or (i == self.n - 1 and j == self.n - 1)):
                     self.domains[i][j].remove('M')
                 # top
                 if i == 0 and 'B' in self.domains[i][j]:
@@ -144,8 +147,6 @@ class Board:
         # already assigned to that piece
         if self.squares[i][j] == piece and not isPreprocess:
             updateSums = False
-
-        v = self.getVarByIndex(i, j)
 
         self.squares[i][j] = piece
         self.domains[i][j] = [piece]
@@ -192,18 +193,17 @@ class Board:
         if piece == 'W':
             self.rowWaterSum[i] += 1
             self.colWaterSum[j] += 1
-        # elif piece == 'S':
-        #     self.sSum += 1
-        # elif piece == 'L':
-        #     self.lSum += 1
-        # elif piece == 'R':
-        #     self.rSum += 1
-        # elif piece == 'T':
-        #     self.tSum += 1
-        # elif piece == 'B':
-        #     self.bSum += 1
-        # elif piece == 'M':
-        #     self.mSum += 1
+        else:
+            if piece in self.pieceSum:
+                self.pieceSum[piece] += 1
+            else:
+                self.pieceSum[piece] = 1
+
+            if self.pieceSum[piece] > self.pieceMax[piece]:
+                for i in range(self.n):
+                    for j in range(self.n):
+                        if piece in self.domains[i][j]:
+                            self.domains[i][j].remove(piece)
 
         if self.rowPieceSum[i] == self.rowPieceCount:
             for j in range(self.n):
@@ -316,12 +316,17 @@ class Board:
     def findMinDomain(self):
         min = sys.maxsize
         minI, minJ = -1, -1
+
         for i in range(self.n):
             for j in range(self.n):
+                if self.assigned[i][j]:
+                    continue
+
                 size = len(self.domains[i][j])
-                if size < min and not self.assigned[self.getVarByIndex(i, j)]:
+                if size < min:
                     min = size
                     minI, minJ = i, j
+
         return minI, minJ
 
     def findMinUnassigned(self):
@@ -479,18 +484,18 @@ def solveCSP(board):
     return False
 
 def readBoard(inputPath):
-    board = Board()
     inputFile = open(inputPath)
 
-    board.rowPieceCount = [int(char) for char in inputFile.readline()[:-1]]
-    board.colPieceCount = [int(char) for char in inputFile.readline()[:-1]]
-    board.ships = [int(char) for char in inputFile.readline()[:-1]]
+    rowPieceCount = [int(char) for char in inputFile.readline()[:-1]]
+    colPieceCount = [int(char) for char in inputFile.readline()[:-1]]
+    ships = [int(char) for char in inputFile.readline()[:-1]]
 
     lines = inputFile.read().splitlines()
+    squares = []
     for line in lines:
-        board.squares.append(list(line))
+        squares.append(list(line))
 
-    return board
+    return Board(rowPieceCount, colPieceCount, ships, squares)
 
 
 def writeBoard(board, outputPath):
@@ -506,19 +511,3 @@ outputPath = "output.txt"
 
 # inputPath = sys.argv[1] # Input file
 # outputPath = sys.argv[2] # Output file
-#
-# print('### readBoard ###')
-# board = readBoard(inputPath)
-# board.print()
-#
-# print('### initializeVariables ###')
-# board.initializeVariables()
-# board.print()
-#
-# print('### preprocess ###')
-# board.preprocess()
-# board.print()
-#
-# print('### solveCSP ###')
-# solveCSP(board)
-# board.print()

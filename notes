@@ -45,7 +45,12 @@ constraints
         water count
 
     piece constraint
-        piece count
+        sum of given piece <= count of given piece
 
     M constraint
         cant be surrounded by W on two sides not in same col/row
+
+
+assignSquare
+    check if square being assigned is already assigned?
+        wont work with current way because i dont check water adj constraints after assignment
