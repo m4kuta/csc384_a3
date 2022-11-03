@@ -7,35 +7,39 @@ class Board:
         self.rowPieceCount = []
         self.colPieceCount = []
         self.ships = []  # submarines, destroyers, cruisers, battleships
-        self.squares = []
 
         self.n = 0
         self.N = 0
 
+        self.squares = []
+        self.domains = []
+        self.assigned = []
+
+
         self.rowPieceRem = []
         self.colPieceRem = []
+
         self.rowPieceSum = []
         self.colPieceSum = []
 
         self.rowWaterSum = []
         self.colWaterSum = []
 
-        self.sMax = 0
-        self.lMax = 0
-        self.rMax = 0
-        self.tMax = 0
-        self.bMax = 0
-        self.mMax = 0
+        self.pieceCounts = {}
+        # self.sCount = 0
+        # self.lCount = 0
+        # self.rCount = 0
+        # self.tCount = 0
+        # self.bCount = 0
+        # self.mCount = 0
 
-        self.sSum = 0
-        self.lSum = 0
-        self.rSum = 0
-        self.tSum = 0
-        self.bSum = 0
-        self.mSum = 0
-
-        self.domains = []
-        self.assigned = []
+        self.pieceSums = {}
+        # self.sSum = 0
+        # self.lSum = 0
+        # self.rSum = 0
+        # self.tSum = 0
+        # self.bSum = 0
+        # self.mSum = 0
 
 
     # region HELPERS
@@ -60,33 +64,33 @@ class Board:
 
     def getRowUnassigned(self, i):
         sum = 0
-        for v in range(i * self.n, i * self.n + self.n):
-            if not self.assigned[v]:
+        for j in range(self.n):
+            if not self.assigned[i][j]:
                 sum += 1
         return sum
 
     def getColUnassigned(self, j):
         sum = 0
-        for v in range(j, self.n * self.n - 1 + j, self.n):
-            if not self.assigned[v]:
+        for i in range(self.n):
+            if not self.assigned[i][j]:
                 sum += 1
         return sum
     # endregion HELPERS
 
     # region PREPROCESSING
-    def defineVariables(self):
+    def initializeVariables(self):
         self.n = len(self.squares)
         self.N = self.n ** 2
 
-        self.variables = range(self.N)
         self.domains = [[['W', 'S', 'L', 'R', 'T', 'B', 'M'] for j in range(self.n)] for i in range(self.n)]
-        self.assigned = [False] * self.N
-        self.values = ['0'] * self.N
+        self.assigned = [[False for j in range(self.n)] for i in range(self.n)]
 
         self.rowPieceRem = list(self.rowPieceCount)
         self.colPieceRem = list(self.colPieceCount)
+
         self.rowPieceSum = [0] * self.n
         self.colPieceSum = [0] * self.n
+
         self.rowWaterSum = [0] * self.n
         self.colWaterSum = [0] * self.n
 
@@ -101,6 +105,11 @@ class Board:
                     self.makeAdjWater(i, j, square)
 
                 # edge row/column piece constraints
+                # corner
+                if 'M' in self.domains[i][j] and \
+                        (i == 0 and j == 0) or (i == 0 and j == self.n - 1) or \
+                        (i == self.n - 1 and j == 0) or (i == self.n - 1 and j == self.n -1):
+                    self.domains[i][j].remove('M')
                 # top
                 if i == 0 and 'B' in self.domains[i][j]:
                     self.domains[i][j].remove('B')
@@ -140,8 +149,7 @@ class Board:
 
         self.squares[i][j] = piece
         self.domains[i][j] = [piece]
-        self.values[v] = piece
-        self.assigned[v] = True
+        self.assigned[i][j] = True
 
         # TODO: move constraints out of assign
         # TODO: add index constraints? should already be handled by preprocessing
@@ -184,18 +192,18 @@ class Board:
         if piece == 'W':
             self.rowWaterSum[i] += 1
             self.colWaterSum[j] += 1
-        elif piece == 'S':
-            self.sSum += 1
-        elif piece == 'L':
-            self.lSum += 1
-        elif piece == 'R':
-            self.rSum += 1
-        elif piece == 'T':
-            self.tSum += 1
-        elif piece == 'B':
-            self.bSum += 1
-        elif piece == 'M':
-            self.mSum += 1
+        # elif piece == 'S':
+        #     self.sSum += 1
+        # elif piece == 'L':
+        #     self.lSum += 1
+        # elif piece == 'R':
+        #     self.rSum += 1
+        # elif piece == 'T':
+        #     self.tSum += 1
+        # elif piece == 'B':
+        #     self.bSum += 1
+        # elif piece == 'M':
+        #     self.mSum += 1
 
         if self.rowPieceSum[i] == self.rowPieceCount:
             for j in range(self.n):
@@ -294,9 +302,10 @@ class Board:
     # region SELECTION
     def pickUnassignedVar(self):
         # Baseline
-        # for v in range(self.N):
-        #     if not self.assigned[v]:
-        #         return v
+        # for i in range(self.n):
+        #     for j in range(self.n):
+        #         if not self.assigned[i][j]:
+        #             return v
 
         # Min unassigned row/col intersection
         return self.findMinUnassigned()
@@ -313,17 +322,17 @@ class Board:
                 if size < min and not self.assigned[self.getVarByIndex(i, j)]:
                     min = size
                     minI, minJ = i, j
-        return self.getVarByIndex(minI, minJ)
+        return minI, minJ
 
     def findMinUnassigned(self):
         # intersection of row and col with min total unassigned
         min = sys.maxsize
-        minV = -1 # will never return -1 as solveCSP returns if False not in board.assigned
+        minI = -1
+        minJ = -1
 
         for i in range(self.n):
             for j in range(self.n):
-                v = self.getVarByIndex(i, j)
-                if self.assigned[v]:
+                if self.assigned[i][j]:
                     continue
 
                 rowRem = self.getRowUnassigned(i)
@@ -334,9 +343,10 @@ class Board:
                 rem = rowRem + colRem
                 if rem < min:
                     min = rem
-                    minV = v
+                    minI = i
+                    minJ = j
 
-        return minV
+        return minI, minJ
     # endregion SELECTION
 
     # region CONSTRAINTS
@@ -429,16 +439,21 @@ class Board:
         pass
     # endregion CONSTRAINTS
 
+    def hasUnassignedVar(self):
+        for i in range(self.n):
+            for j in range(self.n):
+                if not self.assigned[i][j]:
+                    return True
+        return False
 
 def solveCSP(board):
-    if False not in board.assigned:
-        writeBoard(board, 'solution_test.txt')
+    if not board.hasUnassignedVar():
+        writeBoard(board, outputPath)
         exit()
 
     ogBoard = deepcopy(board)
-    v = board.pickUnassignedVar()
-    board.assigned[v] = True
-    i, j = board.getIndexByVar(v)
+    i, j = board.pickUnassignedVar()
+    board.assigned[i][j] = True
 
     for d in board.domains[i][j]:
         board.assignSquare(i, j, d)
@@ -460,7 +475,7 @@ def solveCSP(board):
         # print('### UNDO ###')
         # board.print()
 
-    board.assigned[v] = False
+    board.assigned[i][j] = False
     return False
 
 def readBoard(inputPath):
@@ -486,6 +501,9 @@ def writeBoard(board, outputPath):
             string += square
         outputFile.write(string + '\n') # TODO remove final blank line
 
+
+outputPath = "output.txt"
+
 # inputPath = sys.argv[1] # Input file
 # outputPath = sys.argv[2] # Output file
 #
@@ -493,8 +511,8 @@ def writeBoard(board, outputPath):
 # board = readBoard(inputPath)
 # board.print()
 #
-# print('### defineVariables ###')
-# board.defineVariables()
+# print('### initializeVariables ###')
+# board.initializeVariables()
 # board.print()
 #
 # print('### preprocess ###')
