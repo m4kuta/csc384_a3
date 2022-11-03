@@ -3,7 +3,8 @@
     preprocess
     solve csp
         select var
-        heuristics
+            heuristics
+        assign var
 
 define variables using dictionaries (or lists)
     id
@@ -17,9 +18,12 @@ preprocessing
     rowMax == 0 => all water row
     colMax == 0 => all water col
     given piece => water adjacency
+    remove left from domain in right column
+    remove right from domain in left column
+    remove top from domain in bottom column
+    remove bottom from domain in top column
 
 select var
-
 
 heuristic
     select square in row/col combo that has highest sum <= max
@@ -28,6 +32,9 @@ heuristic
             either S or W
         3 W and 1 piece
             either piece or W
+
+assign var
+
 
 constraints
     row constraint
@@ -39,6 +46,3 @@ constraints
 
     piece constraint
         piece count
-
-    waterAdj constraint
-

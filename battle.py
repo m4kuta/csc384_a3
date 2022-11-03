@@ -68,6 +68,20 @@ class Board:
 
     def getVarByIndex(self, i, j):
         return i * self.n + j
+
+    def getRowUnassigned(self, i):
+        sum = 0
+        for v in range(i * self.n, i * self.n + self.n):
+            if not self.assigned[v]:
+                sum += 1
+        return sum
+
+    def getColUnassigned(self, j):
+        sum = 0
+        for v in range(j, self.n * self.n - 1 + j, self.n):
+            if not self.assigned[v]:
+                sum += 1
+        return sum
     # endregion HELPERS
 
     # region PREPROCESSING
@@ -76,7 +90,7 @@ class Board:
         self.N = self.n ** 2
 
         self.variables = range(self.N)
-        self.domains = [['W', 'S', 'L', 'R', 'T', 'B', 'M'] for v in range(self.N)]
+        self.domains = [[['W', 'S', 'L', 'R', 'T', 'B', 'M'] for j in range(self.n)] for i in range(self.n)]
         self.assigned = [False] * self.N
         self.values = ['0'] * self.N
 
@@ -93,110 +107,78 @@ class Board:
 
             # water adj constraint
             if square != '0' and square != 'W':
-                self.assignSquare(i, j, square)
+                self.assignSquare(i, j, square, True)
                 self.makeAdjWater(i, j, square)
 
             # edge row/column piece constraints
-            v = self.getVarByIndex(i, j)
             # top
-            if i == 0 and 'B' in self.domains[v]:
-                self.domains[v].remove('B')
+            if i == 0 and 'B' in self.domains[i][j]:
+                self.domains[i][j].remove('B')
             # bottom
-            if i == self.n - 1 and 'T' in self.domains[v]:
-                self.domains[v].remove('T')
+            if i == self.n - 1 and 'T' in self.domains[i][j]:
+                self.domains[i][j].remove('T')
             # left
-            if j == 0 and 'R' in self.domains[v]:
-                self.domains[v].remove('R')
+            if j == 0 and 'R' in self.domains[i][j]:
+                self.domains[i][j].remove('R')
             # right
-            if j == self.n - 1 and 'L' in self.domains[v]:
-                self.domains[v].remove('L')
+            if j == self.n - 1 and 'L' in self.domains[i][j]:
+                self.domains[i][j].remove('L')
 
         # row max piece constraint
         for i in range(self.n):
-            if self.rowPieceCount[i] == 0 or self.rowPieceRem[i] == 0:
+            if self.rowPieceCount[i] == 0 or self.rowPieceSum[i] == self.rowPieceCount[i]:
                 for j in range(self.n):
                     if self.squares[i][j] == '0':
                         self.assignSquare(i, j, 'W')
 
         # col max piece constraint
         for j in range(self.n):
-            if self.colPieceCount[j] == 0 or self.colPieceRem[j] == 0:
+            if self.colPieceCount[j] == 0 or self.colPieceSum[j] == self.colPieceCount[j]:
                 for i in range(self.n):
                     if self.squares[i][j] == '0':
                         self.assignSquare(i, j, 'W')
     # endregion PREPROCESSING
 
     # region ASSIGNMENT
-    def assignSquare(self, i, j, piece):
+    def assignSquare(self, i, j, piece, isPreprocess = False):
         updateSums = True
         # already assigned to that piece
-        if self.squares[i][j] == piece:
+        if self.squares[i][j] == piece and not isPreprocess:
             updateSums = False
 
         v = self.getVarByIndex(i, j)
 
         self.squares[i][j] = piece
-        self.domains[v] = [piece]
+        self.domains[i][j] = [piece]
         self.values[v] = piece
         self.assigned[v] = True
 
         # TODO: add index constraints? should already be handled by preprocessing
         if piece == 'L':
-            v = self.getVarByIndex(i, j + 1)
-            if 'W' in self.domains[v]: self.domains[v].remove('W')
-            if 'S' in self.domains[v]: self.domains[v].remove('S')
-            if 'L' in self.domains[v]: self.domains[v].remove('L')
-            if 'T' in self.domains[v]: self.domains[v].remove('T')
-            if 'B' in self.domains[v]: self.domains[v].remove('B')
+            domain = self.domains[i][j+1]
+            domain = [d for d in domain if d not in ['W', 'S', 'L', 'T', 'B']]
         elif piece == 'R':
-            v = self.getVarByIndex(i, j - 1)
-            if 'W' in self.domains[v]: self.domains[v].remove('W')
-            if 'S' in self.domains[v]: self.domains[v].remove('S')
-            if 'R' in self.domains[v]: self.domains[v].remove('R')
-            if 'T' in self.domains[v]: self.domains[v].remove('T')
-            if 'B' in self.domains[v]: self.domains[v].remove('B')
+            domain = self.domains[i][j - 1]
+            domain = [d for d in domain if d not in ['W', 'S', 'R', 'T', 'B']]
         elif piece == 'T':
-            v = self.getVarByIndex(i + 1, j)
-            if 'W' in self.domains[v]: self.domains[v].remove('W')
-            if 'S' in self.domains[v]: self.domains[v].remove('S')
-            if 'L' in self.domains[v]: self.domains[v].remove('L')
-            if 'R' in self.domains[v]: self.domains[v].remove('R')
-            if 'T' in self.domains[v]: self.domains[v].remove('T')
+            domain = self.domains[i + 1][j]
+            domain = [d for d in domain if d not in ['W', 'S', 'L', 'R', 'T']]
         elif piece == 'B':
-            v = self.getVarByIndex(i - 1, j)
-            if 'W' in self.domains[v]: self.domains[v].remove('W')
-            if 'S' in self.domains[v]: self.domains[v].remove('S')
-            if 'L' in self.domains[v]: self.domains[v].remove('L')
-            if 'R' in self.domains[v]: self.domains[v].remove('R')
-            if 'B' in self.domains[v]: self.domains[v].remove('B')
+            domain = self.domains[i - 1][j]
+            domain = [d for d in domain if d not in ['W', 'S', 'L', 'R', 'B']]
         elif piece == 'M':
             if i > 0:
-                v = self.getVarByIndex(i - 1, j)
-                if 'S' in self.domains[v]: self.domains[v].remove('S')
-                if 'L' in self.domains[v]: self.domains[v].remove('L')
-                if 'R' in self.domains[v]: self.domains[v].remove('R')
-                if 'B' in self.domains[v]: self.domains[v].remove('B')
-
+                domain = self.domains[i - 1][j]
+                domain = [d for d in domain if d not in ['S', 'L', 'R', 'B']]
             if i < self.n - 1:
-                v = self.getVarByIndex(i + 1, j)
-                if 'S' in self.domains[v]: self.domains[v].remove('S')
-                if 'L' in self.domains[v]: self.domains[v].remove('L')
-                if 'R' in self.domains[v]: self.domains[v].remove('R')
-                if 'T' in self.domains[v]: self.domains[v].remove('T')
-
+                domain = self.domains[i + 1][j]
+                domain = [d for d in domain if d not in ['S', 'L', 'R', 'T']]
             if j > 0:
-                v = self.getVarByIndex(i, j - 1)
-                if 'S' in self.domains[v]: self.domains[v].remove('S')
-                if 'R' in self.domains[v]: self.domains[v].remove('R')
-                if 'T' in self.domains[v]: self.domains[v].remove('T')
-                if 'B' in self.domains[v]: self.domains[v].remove('B')
-
+                domain = self.domains[i][j - 1]
+                domain = [d for d in domain if d not in ['S', 'R', 'T', 'B']]
             if j < self.n - 1:
-                v = self.getVarByIndex(i, j + 1)
-                if 'S' in self.domains[v]: self.domains[v].remove('S')
-                if 'L' in self.domains[v]: self.domains[v].remove('L')
-                if 'T' in self.domains[v]: self.domains[v].remove('T')
-                if 'B' in self.domains[v]: self.domains[v].remove('B')
+                domain = self.domains[i][j + 1]
+                domain = [d for d in domain if d not in ['S', 'L', 'T', 'B']]
 
 
         if not updateSums:
@@ -223,6 +205,14 @@ class Board:
             self.bSum += 1
         elif piece == 'M':
             self.mSum += 1
+
+        if self.rowPieceSum[i] == self.rowPieceCount:
+            for j in range(self.n):
+                self.assignSquare(i, j, 'W')
+
+        if self.colPieceSum[i] == self.colPieceCount:
+            for i in range(self.n):
+                self.assignSquare(i, j, 'W')
 
     def makeAdjWater(self, i, j, piece):
         # ['0', 'W', 'S', 'L', 'R', 'T', 'B', 'M']
@@ -312,31 +302,44 @@ class Board:
 
     # region SELECTION
     def pickUnassignedVar(self):
-        # row, col = self.findMinRemaining()
-        # return row * self.n + col + 1
+        # Baseline
+        # for v in range(self.N):
+        #     if not self.assigned[v]:
+        #         return v
 
-        for v in range(self.N):
-            if not self.assigned[v]:
-                return v
+        # Min unassigned row/col intersection
+        return self.findMinUnassigned()
 
+        # MRV in domain
+        # return self.findMinDomain()
 
-    def findMinRemaining(self):
+    def findMinDomain(self):
         min = sys.maxsize
-        minRow = -1
-        minCol = -1
+        minI, minJ = -1, -1
+        for i, j in itertools.product(range(self.n), range(self.n)):
+            size = len(self.domains[i][j])
+            if size < min and not self.assigned[self.getVarByIndex(i, j)]:
+                min = size
+                minI, minJ = i, j
+        return self.getVarByIndex(minI, minJ)
+
+    def findMinUnassigned(self):
+        # intersection of row and col with min total unassigned
+        min = sys.maxsize
+        minV = -1 # will never return -1 as solveCSP returns if False not in board.assigned
 
         for i in range(self.n):
             for j in range(self.n):
-                rowRem = self.rowPieceRem[i]
-                colRem = self.colPieceRem[j]
+                rowRem = self.getRowUnassigned(i)
+                colRem = self.getColUnassigned(j)
                 if rowRem > 0 and colRem > 0:
                     rem = rowRem + colRem
-                    if rem < min:
+                    v = self.getVarByIndex(i, j)
+                    if rem < min and not self.assigned[v]:
                         min = rem
-                        minRow = i
-                        minCol = j
+                        minV = v
 
-        return minRow, minCol
+        return minV
     # endregion SELECTION
 
     # region CONSTRAINTS
@@ -396,14 +399,15 @@ class Board:
 
 def solveCSP(board):
     if False not in board.assigned:
-        return True
+        writeBoard(board, 'solution_test.txt')
+        exit()
 
     ogBoard = deepcopy(board)
     v = board.pickUnassignedVar()
     board.assigned[v] = True
     i, j = board.getIndexByVar(v)
 
-    for d in board.domains[v]:
+    for d in board.domains[i][j]:
         board.assignSquare(i, j, d)
         board.makeAdjWater(i, j, d)
         # print('### STEP TEST ###')
@@ -451,3 +455,19 @@ def writeBoard(board, outputPath):
 
 # inputPath = sys.argv[1] # Input file
 # outputPath = sys.argv[2] # Output file
+#
+# print('### readBoard ###')
+# board = readBoard(inputPath)
+# board.print()
+#
+# print('### defineVariables ###')
+# board.defineVariables()
+# board.print()
+#
+# print('### preprocess ###')
+# board.preprocess()
+# board.print()
+#
+# print('### solveCSP ###')
+# solveCSP(board)
+# board.print()
